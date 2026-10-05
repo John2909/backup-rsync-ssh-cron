@@ -1,0 +1,5 @@
+*.log
+id_*
+!*.pub
+*.key
+.env
