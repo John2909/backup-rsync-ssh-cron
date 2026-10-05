@@ -1,0 +1,11 @@
+#la configuration se fait dans le fichier se trouvant dans le repertoire /etc/logrotate.d/backup
+
+/var/log/backup/backup.log {
+    su srv-principal srv-principal
+    weekly
+    rotate 4
+    compress
+    missingok
+    notifempty
+    create 0640 srv-principal srv-principal
+}
