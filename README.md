@@ -2,7 +2,7 @@
 
 Solution de sauvegarde **automatique, sécurisée et testée** d'un serveur Linux vers un serveur de sauvegarde distant, réalisée avec les outils natifs d'Ubuntu Server : `rsync`, `SSH`, `cron` et des scripts `bash`.
 
-> Projet Personnel.
+> Projet personnel de mise en pratique en administration système Linux.
 
 ## Sommaire
 
@@ -15,9 +15,9 @@ Solution de sauvegarde **automatique, sécurisée et testée** d'un serveur Linu
 7. [Sécurité](#sécurité)
 8. [Problèmes rencontrés](#problèmes-rencontrés)
 9. [Limites et améliorations](#limites-et-améliorations)
-10. [Auteur](#auteur-et-licence)
+10. [Auteur](#auteur)
 
-\---
+---
 
 ## Objectifs
 
@@ -42,13 +42,13 @@ Solution de sauvegarde **automatique, sécurisée et testée** d'un serveur Linu
 ```
 
 |Machine|Rôle|Système|Utilisateur|Dossier|
-|-|-|-|-|-|
+|---|---|---|---|---|
 |`srv-principal`|Héberge les données, exécute la sauvegarde|Ubuntu Server|`srv-principal`|`/srv/data`|
 |`srv-backup`|Stocke les copies|Ubuntu Server|`backupuser`|`/backup/data`|
 
-Les deux machines sont des machines virtuelles vmware en mode **Accès par pont**.
+Les deux machines sont des machines virtuelles **VMware** en mode réseau **Bridged** (accès par pont).
 
-!\[Les deux machines virtuelles](docs/images/01-vms-vmware.png)
+![Les deux machines virtuelles](docs/images/01-vms-vmware.png)
 
 ## Prérequis
 
@@ -57,7 +57,7 @@ Les deux machines sont des machines virtuelles vmware en mode **Accès par pont*
 * Paquets `rsync` et `openssh-server` installés sur les deux machines
 
 ```bash
-sudo apt update \\\&\\\& sudo apt install -y rsync openssh-server
+sudo apt update && sudo apt install -y rsync openssh-server
 ```
 
 ## Structure du dépôt
@@ -73,46 +73,53 @@ sudo apt update \\\&\\\& sudo apt install -y rsync openssh-server
 │   ├── crontab.example      # Planification
 │   ├── logrotate-backup     # Rotation des logs
 │   ├── sshd-hardening.conf  # Durcissement SSH (srv-backup)
-│   ├── authorized\\\_keys.example
+│   ├── authorized_keys.example
 │   └── ufw-rules.sh         # Pare-feu (srv-backup)
 └── docs/images/             # Captures d'écran
 ```
 
-\---
+---
 
 ## Installation pas à pas
 
-### 1\. Préparer le réseau
+### 1. Préparer le réseau
 
 Renommer les machines, fixer les IP (netplan) et vérifier la communication.
 
 ```bash
-# srv-principal
+# sur srv-principal
 sudo hostnamectl set-hostname srv-principal
-# srv-backup
+# sur srv-backup
 sudo hostnamectl set-hostname srv-backup
+```
 
-# Exemple /etc/netplan/\\\*.yaml pour srv-backup (adapter l'interface et la passerelle)
+Exemple de fichier `/etc/netplan/*.yaml` pour `srv-backup` (adapter le nom de l'interface, vérifiable avec `ip a`, et la passerelle avec `ip route | grep default`) :
+
+```yaml
 network:
   version: 2
   ethernets:
     enp0s3:
       dhcp4: false
-      addresses: \\\[192.168.100.114/24]
+      addresses: [192.168.100.114/24]
       routes:
         - to: default
           via: 192.168.100.1
       nameservers:
-        addresses: \\\[1.1.1.1, 8.8.8.8]
+        addresses: [1.1.1.1, 8.8.8.8]
+```
 
+Puis, sur chaque machine :
+
+```bash
 sudo netplan apply
 ping -c 4 192.168.100.114     # depuis srv-principal
 ping -c 4 192.168.100.113     # depuis srv-backup
 ```
 
-!\[Ping entre les serveurs](docs/images/02-ping-entre-serveurs.png)
+![Ping entre les serveurs](docs/images/02-ping-entre-serveurs.png)
 
-### 2\. Dossier de données et serveur de sauvegarde
+### 2. Dossier de données et serveur de sauvegarde
 
 Sur **srv-principal** :
 
@@ -124,7 +131,7 @@ echo "Document 1" > /srv/data/fichier1.txt
 echo "Document 2" > /srv/data/fichier2.txt
 ```
 
-!\[Données source](docs/images/03-donnees-source.png)
+![Données source](docs/images/03-donnees-source.png)
 
 Sur **srv-backup** :
 
@@ -135,25 +142,25 @@ sudo chown -R backupuser:backupuser /backup
 sudo chmod 700 /backup
 ```
 
-!\[Configuration du serveur de sauvegarde](docs/images/04-serveur-backup-config.png)
+![Configuration du serveur de sauvegarde](docs/images/04-serveur-backup-config.png)
 
-### 3\. Connexion SSH par clé
+### 3. Connexion SSH par clé
 
 Sur **srv-principal** :
 
 ```bash
 ssh-keygen -t ed25519 -C "backup-srv-principal"
 ssh-copy-id backupuser@192.168.100.114
-ssh backupuser@192.168.100.114 "hostname \\\&\\\& whoami"   # aucun mot de passe demandé
+ssh backupuser@192.168.100.114 "hostname && whoami"   # aucun mot de passe demandé
 ```
 
-!\[Génération de la clé](docs/images/05-ssh-keygen.png)
-!\[Copie de la clé](docs/images/06-ssh-copy-id.png)
-!\[Connexion sans mot de passe](docs/images/07-connexion-ssh-sans-mdp.png)
+![Génération de la clé](docs/images/05-ssh-keygen.png)
+![Copie de la clé](docs/images/06-ssh-copy-id.png)
+![Connexion sans mot de passe](docs/images/07-connexion-ssh-sans-mdp.png)
 
 > La clé n'a volontairement pas de passphrase, afin que cron puisse l'utiliser. Les risques sont réduits à l'étape 8.
 
-### 4\. Script de sauvegarde
+### 4. Script de sauvegarde
 
 Le script est dans [`scripts/backup.sh`](scripts/backup.sh) et s'installe dans `/usr/local/bin/`.
 
@@ -173,10 +180,10 @@ Points clés du script :
 * un seul fichier de log, `BACKUP OK` ou `BACKUP ECHEC (code N)` à chaque passage
 * aucune option `--delete` : un fichier supprimé sur la source reste disponible sur la sauvegarde
 
-!\[Script de sauvegarde](docs/images/08-script-backup.png)
-!\[Test manuel](docs/images/09-test-manuel.png)
+![Script de sauvegarde](docs/images/08-script-backup.png)
+![Test manuel](docs/images/09-test-manuel.png)
 
-### 5\. Automatisation avec cron
+### 5. Automatisation avec cron
 
 ```bash
 crontab -e
@@ -184,18 +191,18 @@ crontab -e
 
 ```
 # Sauvegarde quotidienne à 05h00
-0 5 \\\* \\\* \\\* /usr/local/bin/backup.sh
+0 5 * * * /usr/local/bin/backup.sh
 
 # Vérification quotidienne à 08h00
-0 8 \\\* \\\* \\\* /usr/local/bin/check-backup.sh >> /var/log/backup/check.log 2>\\\&1
+0 8 * * * /usr/local/bin/check-backup.sh >> /var/log/backup/check.log 2>&1
 ```
 
-Pendant les tests, la fréquence était de `\\\*/5 \\\* \\\* \\\* \\\*` (toutes les 5 minutes). La rotation des logs est gérée par [`config/logrotate-backup`](config/logrotate-backup) (hebdomadaire, 4 archives compressées).
+Pendant les tests, la fréquence était de `*/5 * * * *` (toutes les 5 minutes). La rotation des logs est gérée par [`config/logrotate-backup`](config/logrotate-backup) (hebdomadaire, 4 archives compressées).
 
-!\[Crontab](docs/images/10-crontab.png)
-!\[Logs générés par cron](docs/images/11-logs-cron.png)
+![Crontab](docs/images/10-crontab.png)
+![Logs générés par cron](docs/images/11-logs-cron.png)
 
-### 6\. Test de sauvegarde
+### 6. Test de sauvegarde
 
 ```bash
 echo "test backup" > /srv/data/test.txt        # sur srv-principal
@@ -204,10 +211,10 @@ sudo -u backupuser cat /backup/data/test.txt
 sha256sum /srv/data/test.txt                    # comparer les empreintes des deux côtés
 ```
 
-!\[Fichier créé sur la source](docs/images/12-test-source.png)
-!\[Fichier arrivé sur la destination](docs/images/13-test-destination.png)
+![Fichier créé sur la source](docs/images/12-test-source.png)
+![Fichier arrivé sur la destination](docs/images/13-test-destination.png)
 
-### 7\. Test de restauration
+### 7. Test de restauration
 
 ```bash
 rm /srv/data/test.txt
@@ -216,51 +223,51 @@ rsync -avu  backupuser@192.168.100.114:/backup/data/ /srv/data/   # restauration
 sha256sum /srv/data/test.txt                                    # identique à l'original
 ```
 
-!\[Suppression](docs/images/14-suppression.png)
-!\[Restauration](docs/images/15-restauration.png)
-!\[Vérification](docs/images/16-verification.png)
+![Suppression](docs/images/14-suppression.png)
+![Restauration](docs/images/15-restauration.png)
+![Vérification](docs/images/16-verification.png)
 
 Un script [`scripts/restore.sh`](scripts/restore.sh) rend l'opération plus sûre en situation de panne (`restore.sh --dry-run` pour simuler).
 
-!\[Script de restauration](docs/images/17-restore-script.png)
+![Script de restauration](docs/images/17-restore-script.png)
 
-### 8\. Durcissement de la sécurité
+### 8. Durcissement de la sécurité
 
 Sur **srv-backup** :
 
-* **Clé SSH restreinte** dans `authorized\\\_keys` : utilisable uniquement depuis `192.168.100.113`, sans terminal ni redirection de ports ([exemple](config/authorized_keys.example))
+* **Clé SSH restreinte** dans `authorized_keys` : utilisable uniquement depuis `192.168.100.113`, sans terminal ni redirection de ports ([exemple](config/authorized_keys.example))
 * **Authentification par mot de passe désactivée** ([`config/sshd-hardening.conf`](config/sshd-hardening.conf))
 * **Pare-feu UFW** : seul SSH depuis `srv-principal` est autorisé ([`config/ufw-rules.sh`](config/ufw-rules.sh))
 
-!\[Clé restreinte](docs/images/18-authorized-keys.png)
-!\[Durcissement SSH](docs/images/19-sshd-hardening.png)
-!\[Pare-feu](docs/images/20-ufw-status.png)
-!\[Journal SSH](docs/images/21-journal-ssh.png)
+![Clé restreinte](docs/images/18-authorized-keys.png)
+![Durcissement SSH](docs/images/19-sshd-hardening.png)
+![Pare-feu](docs/images/20-ufw-status.png)
+![Journal SSH](docs/images/21-journal-ssh.png)
 
-### 9\. Test d'échec et supervision
+### 9. Test d'échec et supervision
 
 `srv-backup` a été éteint pour vérifier que l'échec est bien enregistré, puis rallumé : la sauvegarde a rattrapé son retard sans perte de données.
 
-!\[Échec de sauvegarde](docs/images/22-echec-sauvegarde.png)
+![Échec de sauvegarde](docs/images/22-echec-sauvegarde.png)
 
 Le script [`scripts/check-backup.sh`](scripts/check-backup.sh) contrôle l'âge de la dernière sauvegarde réussie :
 
 |Code de retour|Signification|
-|-|-|
+|---|---|
 |`0`|OK|
 |`1`|Dernière sauvegarde réussie trop ancienne|
 |`2`|Aucune sauvegarde réussie dans le log|
 |`3`|Date illisible dans le log|
 
-!\[Vérification de la sauvegarde](docs/images/23-check-backup.png)
-!\[Crontab de production](docs/images/24-crontab-production.png)
+![Vérification de la sauvegarde](docs/images/23-check-backup.png)
+![Crontab de production](docs/images/24-crontab-production.png)
 
-\---
+---
 
 ## Utilisation
 
 |Action|Commande|
-|-|-|
+|---|---|
 |Lancer une sauvegarde manuelle|`/usr/local/bin/backup.sh`|
 |Consulter le journal|`tail -n 30 /var/log/backup/backup.log`|
 |Vérifier l'état de la dernière sauvegarde|`check-backup.sh`|
@@ -271,7 +278,7 @@ Le script [`scripts/check-backup.sh`](scripts/check-backup.sh) contrôle l'âge 
 ## Sécurité
 
 |Mesure|Mise en place|Risque réduit|
-|-|-|-|
+|---|---|---|
 |Transfert chiffré|rsync via SSH|Écoute du réseau|
 |Authentification par clé|Ed25519, mot de passe SSH désactivé|Attaque par force brute|
 |Clé restreinte|`from=`, `no-pty`, pas de forwarding|Utilisation détournée de la clé volée|
@@ -287,11 +294,11 @@ Le script [`scripts/check-backup.sh`](scripts/check-backup.sh) contrôle l'âge 
 ## Problèmes rencontrés
 
 |Problème|Cause|Solution|
-|-|-|-|
-|`Permission denied (publickey,password)`|Clé SSH non installée sur `srv-backup`|`ssh-copy-id`, puis vérification des droits de `\\\~/.ssh`|
+|---|---|---|
+|`Permission denied (publickey,password)`|Clé SSH non installée sur `srv-backup`|`ssh-copy-id`, puis vérification des droits de `~/.ssh`|
 |Cron n'exécutait pas la sauvegarde|Le script écrivait dans `/var/log` sans les droits, et la clé SSH n'était pas celle de l'utilisateur de cron|Dossier `/var/log/backup` appartenant à l'utilisateur, et tâche cron lancée avec l'utilisateur qui possède la clé|
 |`Permission denied` sur `/srv/data`|Dossier créé avec `sudo`, donc propriété de root|`sudo chown $USER:$USER /srv/data`|
-|Cron bloqué à la première connexion|L'empreinte du serveur n'avait jamais été acceptée (`known\\\_hosts`)|Première connexion SSH manuelle, avec `yes`|
+|Cron bloqué à la première connexion|L'empreinte du serveur n'avait jamais été acceptée (`known_hosts`)|Première connexion SSH manuelle, avec `yes`|
 |Des dizaines de fichiers de log|Un fichier par exécution toutes les 5 minutes|Un seul fichier, avec `logrotate`|
 |`check-backup.sh` : `date: invalid date` puis `syntax error: operand expected`|Extraction de la date par `sed` qui échouait, la variable restait vide|Extraction avec `grep -oE` et vérification du résultat avant le calcul|
 |`PTY allocation request failed` après la restriction de la clé|Comportement voulu : `no-pty` interdit les sessions interactives|Administrer `srv-backup` via un autre compte ou la console|
