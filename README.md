@@ -15,7 +15,7 @@ Solution de sauvegarde **automatique, sécurisée et testée** d'un serveur Linu
 7. [Sécurité](#sécurité)
 8. [Problèmes rencontrés](#problèmes-rencontrés)
 9. [Limites et améliorations](#limites-et-améliorations)
-10. [Auteur](#auteur-et-licence)
+10. [Auteur](#auteur)
 
 \---
 
