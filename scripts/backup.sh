@@ -17,7 +17,7 @@ fi
 
 echo "===== BACKUP START $(date '+%F %T') =====" >> "$LOG"
 
-/usr/bin/rsync -az --stats "$SRC" "$DEST" >> "$LOG" 2>&1
+/usr/bin/rsync -az --stats -e "ssh -o BatchMode=yes -o ConnectTimeout=10" "$SRC" "$DEST" >> "$LOG" 2>&1
 STATUS=$?
 
 if [ $STATUS -eq 0 ]; then

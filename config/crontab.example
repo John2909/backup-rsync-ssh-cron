@@ -1,7 +1,9 @@
 # Sauvegarde de /srv/data vers srv-backup
 # Phase de test : toutes les 5 minutes
-*/5 * * * * /usr/local/bin/backup.sh
+#*/5 * * * * /usr/local/bin/backup.sh
 
-# Production : tous les jours a 02h00
-# 0 2 * * * /usr/local/bin/backup.sh
-EOF
+# Sauvegarde Quotidienne : tous les jours a 05h00
+0 5 * * * /usr/local/bin/backup.sh
+
+# Verification quotidienne a 08h00
+0 8 * * * /usr/local/bin/check-backup.sh >> /var/log/backup/check.log 2>&1
