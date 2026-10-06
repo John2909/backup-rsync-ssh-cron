@@ -1,0 +1,3 @@
+# /home/backupuser/.ssh/authorized_keys (sur srv-backup)
+# Une seule ligne, avec la cle publique de srv-principal :
+from="192.168.1.10",no-pty,no-port-forwarding,no-agent-forwarding,no-X11-forwarding ssh-ed25519 AAAA...A_(pubkey) backup-srv-principal
