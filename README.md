@@ -197,7 +197,7 @@ crontab -e
 0 8 * * * /usr/local/bin/check-backup.sh >> /var/log/backup/check.log 2>&1
 ```
 
-Pendant les tests, la fréquence était de `*/5 * * * *` (toutes les 5 minutes). La rotation des logs est gérée par [`config/logrotate-backup`](config/logrotate-backup) (hebdomadaire, 4 archives compressées).
+Pendant les tests, la fréquence était de `*/5 * * * *` (toutes les 5 minutes). La rotation des logs est gérée par [`config/logrotate-backup`](config/logrotate-backup.txt) (hebdomadaire, 4 archives compressées).
 
 ![Crontab](docs/images/10-crontab.png)
 ![Logs générés par cron](docs/images/11-logs-cron.png)
