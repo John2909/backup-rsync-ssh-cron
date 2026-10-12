@@ -99,7 +99,7 @@ Exemple de fichier `/etc/netplan/*.yaml` pour `srv-backup` (adapter le nom de l'
 network:
   version: 2
   ethernets:
-    enp0s3:
+    ens33:
       dhcp4: false
       addresses: [192.168.100.114/24]
       routes:
